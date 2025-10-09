@@ -68,3 +68,38 @@ def AStarSearch(problema,w1=1,w2=1.5):
     heapq.heappush(frontier,(node.f,node))
     explored=set()
     while frontier:
+        _,node = heapq.heappop(frontier)
+        if problema.is_goal(node.state):
+            return final_path(node)
+        explored.add(node.state)
+        for (next_state,cost) in problema.get_nextNodes(node.state):
+            g=node.g+cost
+            h=problema.heuristic(next_state)
+            f=w1*g+w2*h
+            child=Node(next_state,node,g,h)
+            child.f=f
+            in_frontier=any(n.state==child.state for(_,n)in frontier)
+            if child.state not in explored and not in_frontier:
+                heapq.heappush(frontier,(child.f,child))
+            elif in_frontier:
+                for i,(old_f,n) in enumerate (frontier):
+                    if n.state==child.state and n.f>child.f:
+                        frontier[i]=(child.f,child)
+                        heapq.heapify(frontier)
+                        break
+    return None
+
+
+
+
+#iniciar
+if __name__=="__main__":
+    problema=Problema(Grid.grid)
+    path = AStarSearch(problema)
+
+    if path:
+        print("Ruta:")
+        print (path)
+
+    else:
+        print("no se ha podido encontrar ninguna solucion")
