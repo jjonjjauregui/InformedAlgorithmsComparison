@@ -112,7 +112,7 @@ def visualize_path(grid, path, start_pos, goal_pos):
 
 if __name__ == "__main__":
 
-    grid_data = Grid.grid
+    grid_data = Grid.gridN
     start_pos = (0, 0)
     goal_pos = (6, 5)
 
