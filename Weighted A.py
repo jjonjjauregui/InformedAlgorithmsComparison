@@ -100,6 +100,7 @@ if __name__=="__main__":
     if path:
         print("Ruta:")
         print (path)
+        print(f"Path length: {len(path) - 1} moves")
 
     else:
         print("no se ha podido encontrar ninguna solucion")
