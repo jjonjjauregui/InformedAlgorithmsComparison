@@ -1,4 +1,3 @@
-
 import heapq
 import time
 import tracemalloc
@@ -10,12 +9,11 @@ def measure(func):
     def wrapper(*args, **kwargs):
         tracemalloc.start()
         t0 = time.perf_counter()
-        result = func(*args, **kwargs)
+        result = func(*args, **kwargs)  
         t1 = time.perf_counter()
         current, peak = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
-        # result is (path, cost, metrics)
         path, cost, metrics = result
         metrics = dict(metrics) if metrics else {}
         metrics.update({
@@ -26,63 +24,67 @@ def measure(func):
     return wrapper
 
 
-# ==========
-# Algorithms
-# ==========
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-import time, tracemalloc, heapq, sys, os
-from typing import Dict, Any, List, Tuple
+from datagraph3 import graph, h_values, start, goal
 
-# === allow imports from sibling folders ===
-sys.path.append(os.path.dirname(os.path.dirname(__file__)))
+# Import Greedy algorithm and create wrapper
+from Greedy_B import greedy_best_first_search as original_greedy
+def greedy_best_first_search(graph, start_node, goal_node, h_values):
+    path_and_metrics = original_greedy(graph, start_node, goal_node, h_values)
+    if path_and_metrics and path_and_metrics[0]:
+        path, metrics = path_and_metrics
+        cost = sum(graph[path[i]][path[i+1]] for i in range(len(path)-1))
+        metrics["path_len"] = len(path)-1
+        return path, cost, metrics
+    return [], float('inf'), {"expansions": 0, "generated": 0, "max_frontier": 0}
 
-# === import your own algorithms ===
-# from astar import a_star_search
-from Greedy import greedy_best_first_search
-from Weighted_A import AStarSearch
-from IDA import ida_star
+# Import IDA algorithm and create wrapper
+from IDA_B import ida_star as original_ida
+def ida_star(graph, start_node, goal_node, h_values):
+    path_and_metrics = original_ida(graph, start_node, goal_node, h_values)
+    if path_and_metrics and path_and_metrics[0]:
+        path, metrics = path_and_metrics
+        cost = sum(graph[path[i]][path[i+1]] for i in range(len(path)-1))
+        metrics["path_len"] = len(path)-1
+        return path, cost, metrics
+    return [], float('inf'), {"expansions": 0, "generated": 0, "max_frontier": 0}
 
-# === import graph and heuristics ===
-from datagraph1 import graph, h_values
-start, goal = 'S', 'G'
-
-# === helper to measure time and memory ===
-def measure(func, *args, **kwargs):
-    tracemalloc.start()
-    t0 = time.perf_counter()
-    result = func(*args, **kwargs)
-    t1 = time.perf_counter()
-    current, peak = tracemalloc.get_traced_memory()
-    tracemalloc.stop()
-    path, cost, metrics = result
-    metrics.update({
-        "time_sec": t1 - t0,
-        "peak_mem_kb": peak / 1024.0
-    })
-    return path, cost, metrics
+# Import Weighted A* algorithm and create wrapper
+from Weighted_A import weighted_a_star_search as original_weighted_a
+def weighted_a_star_search(graph, start_node, goal_node, h_values, weight=1.5):
+    path_and_metrics = original_weighted_a(graph, start_node, goal_node, h_values, weight)
+    if path_and_metrics and path_and_metrics[0]:
+        path, metrics = path_and_metrics
+        cost = sum(graph[path[i]][path[i+1]] for i in range(len(path)-1))
+        metrics["path_len"] = len(path)-1
+        return path, cost, metrics
+    return [], float('inf'), {"expansions": 0, "generated": 0, "max_frontier": 0}
 
 
 def run_all(graph, h, start, goal):
     results = []
 
     algorithms = [
-        ("IDA*", ida_star, (graph, start, goal, h)),
-        ("Weighted A* w=1.5", AStarSearch, (graph, start, goal, h, 1.5)),
-        ("Weighted A* w=3", AStarSearch, (graph, start, goal, h, 3)),
-        ("Greedy Best-First", greedy_best_first_search, (graph, start, goal, h))
+        ("A*", weighted_a_star_search, {"graph": graph, "start_node": start, "goal_node": goal, "h_values": h, "weight": 1.0}),
+        ("Weighted A* w=1.5", weighted_a_star_search, {"graph": graph, "start_node": start, "goal_node": goal, "h_values": h, "weight": 1.5}),
+        ("Weighted A* w=3", weighted_a_star_search, {"graph": graph, "start_node": start, "goal_node": goal, "h_values": h, "weight": 3.0}),
+        ("Greedy Best-First", greedy_best_first_search, {"graph": graph, "start_node": start, "goal_node": goal, "h_values": h}),
+        ("IDA*", ida_star, {"graph": graph, "start_node": start, "goal_node": goal, "h_values": h}),
     ]
 
-    for name, func, args in algorithms:
+    for name, func, kwargs in algorithms:
         print(f"→ Running {name} ...")
         try:
-            path, cost, metrics = measure(func, *args)
-            metrics["algorithm"] = name
-            results.append((path, cost, metrics))
+            decorated_func = measure(func)
+            path, cost, metrics = decorated_func(**kwargs)
         except Exception as e:
             print(f"⚠️  {name} failed: {e}")
-            results.append(([], float("inf"), {"algorithm": name}))
+            path, cost, metrics = [], float("inf"), {}
+        metrics.update({"algorithm": name})
+        results.append((path, cost, metrics))
 
     return results
 
@@ -111,10 +113,10 @@ def print_report(results):
         peak_kb  = float(m.get("peak_mem_kb", 0) or 0)
 
         print(f"{algoname:<20} "
-            f"{cost_str:>8} "
-            f"{path_len:>5} "
-            f"{expansions:>6} {generated:>6} {max_open:>9} "
-            f"{time_sec:9.6f} {peak_kb:10.1f}")
+              f"{cost_str:>8} "
+              f"{path_len:>5} "
+              f"{expansions:>6} {generated:>6} {max_open:>9} "
+              f"{time_sec:9.6f} {peak_kb:10.1f}")
 
     print("\nBest paths:")
     for path, cost, m in results:
